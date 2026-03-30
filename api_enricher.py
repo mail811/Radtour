@@ -18,6 +18,17 @@ class StageEnrichment:
     trivia: list[str]
     towns: list[str]
     terrain_description: str
+    gastro: list[dict] = None
+    emergency: list[dict] = None
+    surface: dict = None
+
+    def __post_init__(self):
+        if self.gastro is None:
+            self.gastro = []
+        if self.emergency is None:
+            self.emergency = []
+        if self.surface is None:
+            self.surface = {}
 
 
 def _sample_waypoints(stage: Stage, n: int = 10) -> list[tuple[float, float]]:
@@ -72,15 +83,18 @@ def enrich_tour(tour: TourData, max_dist_km: float = 10.0) -> list[StageEnrichme
     # 3. Zusammenführen
     enrichments = []
     for i, stage in enumerate(tour.stages):
-        campsites, sights = osm_results[i] if i < len(osm_results) else ([], [])
+        osm = osm_results[i] if i < len(osm_results) else {}
         trivia_item = trivia_data[i] if i < len(trivia_data) else {}
 
         enrichments.append(StageEnrichment(
-            sights=sights,
-            campsites=campsites,
+            sights=osm.get("sights", []),
+            campsites=osm.get("campsites", []),
             trivia=trivia_item.get("trivia", []),
             towns=trivia_item.get("towns", [stage.start_point, stage.end_point]),
             terrain_description=trivia_item.get("terrain_description", ""),
+            gastro=osm.get("gastro", []),
+            emergency=osm.get("emergency", []),
+            surface=osm.get("surface", {}),
         ))
 
     return enrichments

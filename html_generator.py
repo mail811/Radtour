@@ -156,6 +156,28 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
                 "stage": i + 1,
                 "website": camp.get("website"),
             })
+        for g in e.gastro:
+            markers.append({
+                "lat": g.get("lat", 0),
+                "lon": g.get("lon", 0),
+                "name": g.get("name", ""),
+                "desc": g.get("opening_hours", ""),
+                "type": "gastro",
+                "category": g.get("category", "restaurant"),
+                "stage": i + 1,
+                "website": g.get("website"),
+            })
+        for em in e.emergency:
+            markers.append({
+                "lat": em.get("lat", 0),
+                "lon": em.get("lon", 0),
+                "name": em.get("name", ""),
+                "desc": em.get("phone", ""),
+                "type": "emergency",
+                "category": em.get("category", ""),
+                "stage": i + 1,
+                "website": em.get("website"),
+            })
     markers_json = json.dumps(markers)
 
     # Farben für Etappen
@@ -177,9 +199,17 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
         if e.terrain_description:
             terrain_html = f'<p class="terrain">{e.terrain_description}</p>'
 
+        # Oberflächen-Info
+        surface_html = ""
+        if e.surface and e.surface.get("surfaces"):
+            paved = e.surface.get("paved_percent", 0)
+            bars = ""
+            for sf in e.surface["surfaces"][:6]:
+                bars += f'<div class="surface-bar"><span class="surface-label">{sf["label"]}</span><div class="surface-track"><div class="surface-fill" style="width:{sf["percent"]}%"></div></div><span class="surface-pct">{sf["percent"]}%</span></div>'
+            surface_html = f'<div class="subsection collapsible"><h4 onclick="toggleSub(this)">Untergrund <span class="sub-badge">{paved}% befestigt</span><span class="sub-chevron">▶</span></h4><div class="sub-body">{bars}</div></div>'
+
         sights_html = ""
         if e.sights:
-            # Nach Kategorie gruppieren
             category_order = [
                 ("schloss", "Burgen & Schloesser", "🏰"),
                 ("museum", "Museen", "🏛"),
@@ -197,14 +227,15 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
                     categories_found[cat] = []
                 categories_found[cat].append(sight)
 
-            sights_html = '<div class="subsection"><h4>Sehenswuerdigkeiten</h4>'
+            inner = ""
             for cat_key, cat_label, cat_icon in category_order:
                 if cat_key in categories_found:
                     items = ""
                     for sight in categories_found[cat_key]:
                         items += f'<li><strong>{sight["name"]}</strong></li>'
-                    sights_html += f'<div class="sight-category"><span class="cat-header">{cat_icon} {cat_label}</span><ul>{items}</ul></div>'
-            sights_html += '</div>'
+                    inner += f'<div class="sight-category"><span class="cat-header">{cat_icon} {cat_label}</span><ul>{items}</ul></div>'
+            count = len(e.sights)
+            sights_html = f'<div class="subsection collapsible" data-stage="{i+1}" data-marker-type="sight"><h4 onclick="toggleSub(this)">Sehenswuerdigkeiten <span class="sub-badge">{count}</span><span class="sub-chevron">▶</span></h4><div class="sub-body">{inner}</div></div>'
 
         camps_html = ""
         if e.campsites:
@@ -214,35 +245,93 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
                 if camp.get("website"):
                     link = f' <a href="{camp["website"]}" target="_blank">Website</a>'
                 items += f'<li><strong>{camp["name"]}</strong> — {camp.get("description", "")}{link}</li>'
-            camps_html = f'<div class="subsection"><h4>Campingplaetze</h4><ul>{items}</ul></div>'
+            count = len(e.campsites)
+            camps_html = f'<div class="subsection collapsible" data-stage="{i+1}" data-marker-type="camp"><h4 onclick="toggleSub(this)">Campingplaetze <span class="sub-badge">{count}</span><span class="sub-chevron">▶</span></h4><div class="sub-body"><ul>{items}</ul></div></div>'
+
+        # Gastronomie
+        gastro_html = ""
+        if e.gastro:
+            gastro_groups = {"supermarkt": [], "cafe": [], "restaurant": []}
+            for g in e.gastro:
+                cat = g.get("category", "restaurant")
+                if cat in gastro_groups:
+                    gastro_groups[cat].append(g)
+
+            inner = ""
+            for cat, icon, label in [("supermarkt", "🛒", "Supermaerkte"), ("cafe", "☕", "Cafes"), ("restaurant", "🍽", "Restaurants")]:
+                group = gastro_groups.get(cat, [])[:8]
+                if group:
+                    items = ""
+                    for g in group:
+                        link = ""
+                        if g.get("website"):
+                            link = f' <a href="{g["website"]}" target="_blank">Website</a>'
+                        hours = ""
+                        if g.get("opening_hours"):
+                            hours = f' <span class="hours">({g["opening_hours"]})</span>'
+                        items += f'<li><strong>{g["name"]}</strong>{hours}{link} <span class="dist">{g["distance_km"]} km</span></li>'
+                    inner += f'<div class="sight-category"><span class="cat-header">{icon} {label}</span><ul>{items}</ul></div>'
+
+            count = len(e.gastro)
+            gastro_html = f'<div class="subsection collapsible" data-stage="{i+1}" data-marker-type="gastro"><h4 onclick="toggleSub(this)">Verpflegung <span class="sub-badge">{count}</span><span class="sub-chevron">▶</span></h4><div class="sub-body">{inner}</div></div>'
+
+        # Notfall-Infos
+        emergency_html = ""
+        if e.emergency:
+            em_groups = {"fahrrad": [], "krankenhaus": [], "bahnhof": []}
+            for em in e.emergency:
+                cat = em.get("category", "")
+                if cat in em_groups:
+                    em_groups[cat].append(em)
+
+            inner = ""
+            for cat, icon, label in [("fahrrad", "🔧", "Fahrradwerkstaetten"), ("krankenhaus", "🏥", "Krankenhaeuser"), ("bahnhof", "🚉", "Bahnhoefe")]:
+                group = em_groups.get(cat, [])[:6]
+                if group:
+                    items = ""
+                    for em in group:
+                        parts = [f'<strong>{em["name"]}</strong>']
+                        if em.get("phone"):
+                            parts.append(f' <a href="tel:{em["phone"]}">{em["phone"]}</a>')
+                        if em.get("website"):
+                            parts.append(f' <a href="{em["website"]}" target="_blank">Website</a>')
+                        parts.append(f' <span class="dist">{em["distance_km"]} km</span>')
+                        items += f'<li>{"".join(parts)}</li>'
+                    inner += f'<div class="sight-category"><span class="cat-header">{icon} {label}</span><ul>{items}</ul></div>'
+
+            count = len(e.emergency)
+            emergency_html = f'<div class="subsection collapsible" data-stage="{i+1}" data-marker-type="emergency"><h4 onclick="toggleSub(this)">Notfall & Service <span class="sub-badge">{count}</span><span class="sub-chevron">▶</span></h4><div class="sub-body">{inner}</div></div>'
 
         trivia_html = ""
         if e.trivia:
             items = "".join(f"<li>{t}</li>" for t in e.trivia)
-            trivia_html = f'<div class="subsection"><h4>Wusstest du?</h4><ul class="trivia">{items}</ul></div>'
+            trivia_html = f'<div class="subsection collapsible"><h4 onclick="toggleSub(this)">Wusstest du? <span class="sub-badge">{len(e.trivia)}</span><span class="sub-chevron">▶</span></h4><div class="sub-body"><ul class="trivia">{items}</ul></div></div>'
+
+        # Wetter: Koordinaten des Etappen-Mittelpunkts für Live-Fetch
+        mid_idx = len(s.points) // 2
+        mid_lat = round(s.points[mid_idx].lat, 4) if s.points else 0
+        mid_lon = round(s.points[mid_idx].lon, 4) if s.points else 0
 
         stages_html += f"""
-    <div class="stage" id="stage-{i+1}">
-      <div class="stage-header" style="border-left: 4px solid {color}" onclick="toggleStage({i+1})">
-        <div>
-          <h3>{s.name}</h3>
-          <div class="stage-stats">
-            <span>{s.distance_km} km</span>
-            <span>↑ {s.elevation_gain}m</span>
-            <span>↓ {s.elevation_loss}m</span>
-            <span>{format_duration(s.duration)}</span>
-          </div>
+    <div class="stage-panel" id="stage-panel-{i+1}" data-stage-idx="{i}">
+      <div class="stage-info" style="border-left: 4px solid {color}">
+        <h3>{s.name}</h3>
+        <div class="stage-stats">
+          <span>{s.distance_km} km</span>
+          <span>↑ {s.elevation_gain}m</span>
+          <span>↓ {s.elevation_loss}m</span>
+          <span>{format_duration(s.duration)}</span>
         </div>
-        <span class="chevron" id="chevron-{i+1}">▼</span>
       </div>
-      <div class="stage-body" id="stage-body-{i+1}">
-        {towns_html}
-        {terrain_html}
-        {sights_html}
-        {camps_html}
-        {trivia_html}
-        <button class="map-btn" onclick="showStage({i})">Auf Karte zeigen</button>
-      </div>
+      <div class="weather-widget" id="weather-{i+1}" data-lat="{mid_lat}" data-lon="{mid_lon}"></div>
+      {towns_html}
+      {terrain_html}
+      {surface_html}
+      {gastro_html}
+      {sights_html}
+      {camps_html}
+      {emergency_html}
+      {trivia_html}
     </div>"""
 
     # Packliste als JSON für JavaScript
@@ -350,21 +439,64 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
     display: block;
   }}
 
-  .stage {{
+  /* Etappen-Reiter */
+  .stage-tabs {{
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 8px;
+    scrollbar-width: none;
+  }}
+  .stage-tabs::-webkit-scrollbar {{
+    display: none;
+  }}
+  .stage-tab {{
+    flex: 0 0 auto;
+    padding: 8px 16px;
+    border: none;
     background: white;
-    border-radius: 10px;
-    margin-bottom: 10px;
-    overflow: hidden;
+    border-radius: 8px 8px 0 0;
+    font-size: 0.85em;
+    font-weight: 600;
+    cursor: pointer;
+    color: #888;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }}
+  .stage-tab.active {{
+    color: #2c3e50;
+    background: white;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   }}
-  .stage-header {{
-    padding: 14px 16px;
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+
+  /* Swipe-Container */
+  .stage-swipe {{
+    position: relative;
+    overflow: hidden;
+    touch-action: pan-y;
   }}
-  .stage-header h3 {{
+  .stage-panel {{
+    display: none;
+    background: white;
+    border-radius: 10px;
+    padding: 0 16px 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    animation: fadeIn 0.2s ease;
+  }}
+  .stage-panel.active {{
+    display: block;
+  }}
+  @keyframes fadeIn {{
+    from {{ opacity: 0; transform: translateX(10px); }}
+    to {{ opacity: 1; transform: translateX(0); }}
+  }}
+
+  .stage-info {{
+    padding: 14px 0;
+  }}
+  .stage-info h3 {{
     font-size: 1em;
     margin-bottom: 4px;
   }}
@@ -373,21 +505,6 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
     gap: 12px;
     font-size: 0.8em;
     color: #666;
-  }}
-  .chevron {{
-    font-size: 0.8em;
-    transition: transform 0.2s;
-    color: #999;
-  }}
-  .chevron.open {{
-    transform: rotate(180deg);
-  }}
-  .stage-body {{
-    display: none;
-    padding: 0 16px 16px;
-  }}
-  .stage-body.open {{
-    display: block;
   }}
 
   .towns {{
@@ -560,6 +677,126 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
     margin-bottom: 6px;
   }}
 
+  /* Aufklappbare Subsektionen */
+  .collapsible > h4 {{
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+  }}
+  .collapsible > h4:hover {{
+    opacity: 0.8;
+  }}
+  .sub-chevron {{
+    font-size: 0.7em;
+    transition: transform 0.2s;
+    margin-left: auto;
+    color: #999;
+  }}
+  .collapsible.open .sub-chevron {{
+    transform: rotate(90deg);
+  }}
+  .sub-body {{
+    display: none;
+    padding-top: 6px;
+  }}
+  .collapsible.open .sub-body {{
+    display: block;
+  }}
+  .sub-badge {{
+    font-size: 0.7em;
+    background: #e8f4f8;
+    color: #3498db;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-weight: 500;
+  }}
+
+  /* Oberflächen-Balken */
+  .surface-bar {{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    font-size: 0.82em;
+  }}
+  .surface-label {{
+    min-width: 100px;
+    color: #555;
+  }}
+  .surface-track {{
+    flex: 1;
+    height: 8px;
+    background: #eee;
+    border-radius: 4px;
+    overflow: hidden;
+  }}
+  .surface-fill {{
+    height: 100%;
+    background: #3498db;
+    border-radius: 4px;
+  }}
+  .surface-pct {{
+    min-width: 36px;
+    text-align: right;
+    color: #888;
+    font-size: 0.9em;
+  }}
+
+  /* Distanz-Angabe + Öffnungszeiten */
+  .dist {{
+    color: #999;
+    font-size: 0.85em;
+  }}
+  .hours {{
+    color: #888;
+    font-size: 0.9em;
+  }}
+
+  /* Wetter-Widget */
+  .weather-widget {{
+    margin-bottom: 12px;
+  }}
+  .weather-row {{
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }}
+  .weather-day {{
+    flex: 0 0 auto;
+    min-width: 80px;
+    background: linear-gradient(135deg, #e8f4f8, #f0f8ff);
+    border-radius: 8px;
+    padding: 8px 10px;
+    text-align: center;
+    font-size: 0.78em;
+  }}
+  .weather-day .wd-date {{
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 2px;
+  }}
+  .weather-day .wd-icon {{
+    font-size: 1.6em;
+    margin: 2px 0;
+  }}
+  .weather-day .wd-temp {{
+    font-weight: 600;
+    color: #333;
+  }}
+  .weather-day .wd-detail {{
+    color: #666;
+    font-size: 0.92em;
+  }}
+  .weather-loading {{
+    font-size: 0.8em;
+    color: #999;
+    padding: 6px 0;
+  }}
+
   .gps-btn {{
     position: absolute;
     top: 10px;
@@ -607,7 +844,12 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
 
 <div class="content">
   <div id="tab-etappen" class="tab-content active">
-    {stages_html}
+    <div class="stage-tabs">
+      {"".join(f'<button class="stage-tab{" active" if i == 0 else ""}" onclick="switchStage({i})" style="border-bottom-color: {stage_colors[i % len(stage_colors)]}">Tag {i+1}</button>' for i in range(len(tour.stages)))}
+    </div>
+    <div class="stage-swipe" id="stage-swipe">
+      {stages_html}
+    </div>
   </div>
 
   <div id="tab-packliste" class="tab-content">
@@ -703,11 +945,19 @@ const catIcons = {{
   'aussicht': '🔭',
   'attraktion': '🎯',
   'sonstige': '📍',
+  'supermarkt': '🛒',
+  'cafe': '☕',
+  'restaurant': '🍽',
+  'fahrrad': '🔧',
+  'krankenhaus': '🏥',
+  'bahnhof': '🚉',
 }};
 
+// Marker in Layer-Gruppen: markerLayers[stage][type] = L.layerGroup
+const markerLayers = {{}};
 markers.forEach(m => {{
   if (!m.lat || !m.lon) return;
-  const emoji = m.type === 'camp' ? '⛺' : (catIcons[m.category] || '📍');
+  const emoji = catIcons[m.type] || catIcons[m.category] || '📍';
   const icon = L.divIcon({{
     html: '<div style="font-size:18px;">' + emoji + '</div>',
     iconSize: [24, 24],
@@ -716,7 +966,11 @@ markers.forEach(m => {{
   }});
   let popup = '<strong>' + m.name + '</strong><br>' + m.desc;
   if (m.website) popup += '<br><a href="' + m.website + '" target="_blank">Website</a>';
-  L.marker([m.lat, m.lon], {{ icon }}).addTo(map).bindPopup(popup);
+  const marker = L.marker([m.lat, m.lon], {{ icon }}).bindPopup(popup);
+
+  const key = m.stage + '-' + m.type;
+  if (!markerLayers[key]) markerLayers[key] = L.layerGroup();
+  markerLayers[key].addLayer(marker);
 }});
 
 // Navigation
@@ -728,25 +982,78 @@ function switchTab(name) {{
   if (name === 'uebersicht') setTimeout(drawAllProfiles, 50);
 }}
 
-function toggleStage(num) {{
-  const body = document.getElementById('stage-body-' + num);
-  const chevron = document.getElementById('chevron-' + num);
-  body.classList.toggle('open');
-  chevron.classList.toggle('open');
-}}
+// Etappen-Wechsel
+let currentStage = 0;
+const totalStages = stageCoords.length;
 
-function showStage(idx) {{
+function switchStage(idx) {{
+  // Offene Marker der alten Etappe ausblenden
+  hideAllMarkers();
+
+  currentStage = idx;
+
+  // Panels
+  document.querySelectorAll('.stage-panel').forEach((p, i) => {{
+    p.classList.toggle('active', i === idx);
+  }});
+
+  // Tabs
+  document.querySelectorAll('.stage-tab').forEach((t, i) => {{
+    t.classList.toggle('active', i === idx);
+  }});
+
+  // Tab in Sicht scrollen
+  const activeTab = document.querySelectorAll('.stage-tab')[idx];
+  if (activeTab) activeTab.scrollIntoView({{ behavior: 'smooth', block: 'nearest', inline: 'center' }});
+
+  // Karte auf Etappe zoomen + Highlight
   const coords = stageCoords[idx];
   if (coords && coords.length) {{
     map.fitBounds(L.latLngBounds(coords), {{ padding: [30, 30] }});
-    window.scrollTo({{ top: 0, behavior: 'smooth' }});
-    // Highlight
     polylines.forEach((p, i) => {{
       p.setStyle({{ weight: i === idx ? 6 : 3, opacity: i === idx ? 1 : 0.4 }});
     }});
-    setTimeout(() => polylines.forEach(p => p.setStyle({{ weight: 4, opacity: 0.8 }})), 3000);
   }}
 }}
+
+function hideAllMarkers() {{
+  Object.values(markerLayers).forEach(layer => map.removeLayer(layer));
+  // Subsektionen zuklappen
+  document.querySelectorAll('.collapsible.open').forEach(el => el.classList.remove('open'));
+}}
+
+// Erstes Panel aktivieren
+switchStage(0);
+
+// Swipe-Gesten
+(function() {{
+  const swipe = document.getElementById('stage-swipe');
+  if (!swipe) return;
+  let startX = 0;
+  let startY = 0;
+  let tracking = false;
+
+  swipe.addEventListener('touchstart', e => {{
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+  }}, {{ passive: true }});
+
+  swipe.addEventListener('touchend', e => {{
+    if (!tracking) return;
+    tracking = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    // Nur horizontale Swipes (mindestens 50px, mehr horizontal als vertikal)
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {{
+      if (dx < 0 && currentStage < totalStages - 1) {{
+        switchStage(currentStage + 1);
+      }} else if (dx > 0 && currentStage > 0) {{
+        switchStage(currentStage - 1);
+      }}
+    }}
+  }}, {{ passive: true }});
+}})()
 
 // Packliste — drei Fahrer, editierbare Felder
 const packingData = {packing_json};
@@ -899,6 +1206,88 @@ function drawAllProfiles() {{
 }}
 drawAllProfiles();
 window.addEventListener('resize', drawAllProfiles);
+
+// Aufklappbare Subsektionen mit Marker-Steuerung
+function toggleSub(h4) {{
+  const section = h4.parentElement;
+  const isOpening = !section.classList.contains('open');
+  section.classList.toggle('open');
+
+  const stage = section.dataset.stage;
+  const mtype = section.dataset.markerType;
+  if (!stage || !mtype) return;
+
+  const key = stage + '-' + mtype;
+  const layer = markerLayers[key];
+  if (!layer) return;
+
+  if (isOpening) {{
+    layer.addTo(map);
+  }} else {{
+    map.removeLayer(layer);
+  }}
+}}
+
+// Live-Wetter von Open-Meteo
+const wmoIcons = {{
+  0: '☀️', 1: '🌤', 2: '⛅', 3: '☁️',
+  45: '🌫', 48: '🌫',
+  51: '🌦', 53: '🌦', 55: '🌧',
+  61: '🌧', 63: '🌧', 65: '🌧',
+  71: '🌨', 73: '🌨', 75: '❄️',
+  80: '🌦', 81: '🌧', 82: '⛈',
+  95: '⛈', 96: '⛈', 99: '⛈',
+}};
+const dayNames = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+
+async function loadWeather() {{
+  const widgets = document.querySelectorAll('.weather-widget');
+  // Sammle einzigartige Koordinaten
+  const coords = [];
+  widgets.forEach(w => {{
+    const lat = w.dataset.lat;
+    const lon = w.dataset.lon;
+    if (lat && lon && lat !== '0') {{
+      coords.push({{ lat, lon, el: w }});
+      w.innerHTML = '<div class="weather-loading">Lade Wetter...</div>';
+    }}
+  }});
+
+  // Pro Widget einzeln laden (Koordinaten können unterschiedlich sein)
+  for (const c of coords) {{
+    try {{
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${{c.lat}}&longitude=${{c.lon}}&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max,windspeed_10m_max,winddirection_10m_dominant&timezone=Europe/Berlin&forecast_days=7`;
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error('API-Fehler');
+      const data = await resp.json();
+      const d = data.daily;
+
+      let html = '<div class="weather-row">';
+      for (let i = 0; i < Math.min(7, d.time.length); i++) {{
+        const date = new Date(d.time[i] + 'T00:00:00');
+        const dayName = dayNames[date.getDay()];
+        const dateStr = `${{date.getDate()}}.${{date.getMonth() + 1}}.`;
+        const icon = wmoIcons[d.weathercode[i]] || '🌡';
+        const windDir = ['N','NO','O','SO','S','SW','W','NW'][Math.round(d.winddirection_10m_dominant[i] / 45) % 8];
+
+        html += `<div class="weather-day">
+          <div class="wd-date">${{dayName}} ${{dateStr}}</div>
+          <div class="wd-icon">${{icon}}</div>
+          <div class="wd-temp">${{Math.round(d.temperature_2m_min[i])}}° / ${{Math.round(d.temperature_2m_max[i])}}°</div>
+          <div class="wd-detail">💧 ${{d.precipitation_probability_max[i]}}%</div>
+          <div class="wd-detail">💨 ${{Math.round(d.windspeed_10m_max[i])}} km/h ${{windDir}}</div>
+        </div>`;
+      }}
+      html += '</div>';
+      c.el.innerHTML = html;
+    }} catch (e) {{
+      c.el.innerHTML = '<div class="weather-loading">Wetter nicht verfuegbar</div>';
+    }}
+  }}
+}}
+
+// Wetter laden wenn Etappen-Tab sichtbar
+loadWeather();
 
 // GPS-Standort
 let gpsMarker = null;
