@@ -91,8 +91,21 @@ def stage_to_map_data(stage: Stage) -> list[list[float]]:
     return [[p.lat, p.lon] for p in stage.points]
 
 
+def _load_header_image() -> str:
+    """Lädt das Header-Bild als Base64-String, falls vorhanden."""
+    import os, base64
+    img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output", "header.jpg")
+    if not os.path.exists(img_path):
+        return ""
+    with open(img_path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+
 def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: list[str] | None = None) -> str:
     """Generiert die komplette HTML-Seite."""
+
+    # Header-Bild
+    header_b64 = _load_header_image()
 
     # Kartendaten vorbereiten
     all_stages_coords = []
@@ -365,8 +378,25 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
   .hero {{
     background: linear-gradient(135deg, #2c3e50, #3498db);
     color: white;
-    padding: 24px 16px;
     text-align: center;
+    position: relative;
+    overflow: hidden;
+  }}
+  .hero-img {{
+    width: 100%;
+    display: block;
+    opacity: 0.35;
+  }}
+  .hero-overlay {{
+    padding: 24px 16px;
+  }}
+  .hero.has-img .hero-overlay {{
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(44,62,80,0.85));
+    padding: 40px 16px 20px;
   }}
   .hero h1 {{
     font-size: 1.4em;
@@ -827,13 +857,16 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
 </head>
 <body>
 
-<div class="hero">
-  <h1>{tour.name}</h1>
-  <div class="hero-stats">
-    <div class="hero-stat"><span class="value">{tour.total_distance_km}</span> km</div>
-    <div class="hero-stat"><span class="value">{tour.total_elevation_gain}</span> m hoch</div>
-    <div class="hero-stat"><span class="value">{len(tour.stages)}</span> Etappen</div>
-    <div class="hero-stat"><span class="value">{tour.min_ele}–{tour.max_ele}</span> m Hoehe</div>
+<div class="hero{"" if not header_b64 else " has-img"}">
+  {"" if not header_b64 else f'<img class="hero-img" src="data:image/jpeg;base64,{header_b64}" alt="Tour-Foto">'}
+  <div class="hero-overlay">
+    <h1>{tour.name}</h1>
+    <div class="hero-stats">
+      <div class="hero-stat"><span class="value">{tour.total_distance_km}</span> km</div>
+      <div class="hero-stat"><span class="value">{tour.total_elevation_gain}</span> m hoch</div>
+      <div class="hero-stat"><span class="value">{len(tour.stages)}</span> Etappen</div>
+      <div class="hero-stat"><span class="value">{tour.min_ele}–{tour.max_ele}</span> m Hoehe</div>
+    </div>
   </div>
 </div>
 
