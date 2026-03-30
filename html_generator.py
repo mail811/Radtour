@@ -455,7 +455,8 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
   }}
   .stage-tab {{
     flex: 0 0 auto;
-    padding: 8px 16px;
+    padding: 8px 12px;
+    min-width: 36px;
     border: none;
     background: white;
     border-radius: 8px 8px 0 0;
@@ -849,7 +850,7 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
 <div class="content">
   <div id="tab-etappen" class="tab-content active">
     <div class="stage-tabs">
-      {"".join(f'<button class="stage-tab{" active" if i == 0 else ""}" onclick="switchStage({i})" style="border-bottom-color: {stage_colors[i % len(stage_colors)]}">Tag {i+1}</button>' for i in range(len(tour.stages)))}
+      {"".join(f'<button class="stage-tab{" active" if i == 0 else ""}" onclick="switchStage({i})" style="border-bottom-color: {stage_colors[i % len(stage_colors)]}">{i+1}</button>' for i in range(len(tour.stages)))}
     </div>
     <div class="stage-swipe" id="stage-swipe">
       {stages_html}
@@ -869,7 +870,7 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
     <div class="overview-card">
       <h4>Etappen</h4>
       <table class="overview-table">
-        <tr><th>Tag</th><th>Strecke</th><th>km</th><th>Hoehe</th></tr>
+        <tr><th>#</th><th>Strecke</th><th>km</th><th>Hoehe</th></tr>
         {"".join(f'<tr><td>{s.day}</td><td>{s.start_point} → {s.end_point}</td><td>{s.distance_km}</td><td>↑{s.elevation_gain}m</td></tr>' for s in tour.stages)}
       </table>
     </div>

@@ -68,36 +68,50 @@ def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
+_geocode_cache: dict[str, str] = {}
+
+
 def reverse_geocode_simple(lat: float, lon: float) -> str:
-    """Einfache Ortsbestimmung anhand der Koordinaten.
-    Gibt einen groben Ortsnamen zurück basierend auf bekannten Wegpunkten."""
-    # Bekannte Orte entlang typischer Nordrouten
-    known_places = [
-        (52.7528, 13.2455, "Oranienburg"),
-        (52.9218, 11.4679, "Stendal"),
-        (53.0752, 11.9683, "Perleberg"),
-        (53.1189, 11.7974, "Wittenberge"),
-        (53.2504, 10.4085, "Lüneburg"),
-        (53.5511, 9.9937, "Hamburg"),
-        (53.8655, 10.6866, "Lübeck"),
-        (54.3233, 10.1228, "Kiel"),
-        (54.4689, 9.0563, "Schleswig"),
-        (54.7937, 9.4469, "Flensburg"),
-        (54.7818, 8.8558, "Niebüll"),
-        (54.9079, 8.3270, "Westerland/Sylt"),
-        (55.0170, 8.4358, "List auf Sylt"),
-    ]
-    min_dist = float("inf")
-    closest = "Unbekannt"
-    for plat, plon, name in known_places:
-        d = haversine(lat, lon, plat, plon)
-        if d < min_dist:
-            min_dist = d
-            closest = name
-    return closest
+    """Ortsbestimmung via Nominatim Reverse Geocoding mit Cache und Retries."""
+    import urllib.request
+    import urllib.error
+    import json
+    import time
+
+    # Cache-Key auf 2 Dezimalstellen (gleicher Ort bei ~1km Abweichung)
+    cache_key = f"{round(lat, 2)},{round(lon, 2)}"
+    if cache_key in _geocode_cache:
+        return _geocode_cache[cache_key]
+
+    url = (
+        f"https://nominatim.openstreetmap.org/reverse?"
+        f"lat={lat}&lon={lon}&format=json&zoom=10&addressdetails=1"
+    )
+
+    for attempt in range(3):
+        time.sleep(1.5)  # Nominatim Rate-Limit: max 1 req/s
+        req = urllib.request.Request(url)
+        req.add_header("User-Agent", "RadtourAssistent/1.0")
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            addr = data.get("address", {})
+            name = (
+                addr.get("city")
+                or addr.get("town")
+                or addr.get("village")
+                or addr.get("municipality")
+                or addr.get("county", "Unbekannt")
+            )
+            _geocode_cache[cache_key] = name
+            return name
+        except Exception:
+            if attempt < 2:
+                time.sleep(3)
+    return "Unbekannt"
 
 
-def parse_gpx(filepath: str, max_km_per_day: float = 120) -> TourData:
+def parse_gpx(filepath: str, max_km_per_day: float = 30) -> TourData:
     """Parst eine GPX-Datei und teilt die Tour in Tagesetappen auf.
 
     Args:
@@ -192,7 +206,7 @@ def parse_gpx(filepath: str, max_km_per_day: float = 120) -> TourData:
                 thinned.append(stage_points[-1])
 
             stages.append(Stage(
-                name=f"Etappe {day}: {start_name} → {end_name}",
+                name=f"{start_name} → {end_name}",
                 day=day,
                 start_point=start_name,
                 end_point=end_name,

@@ -22,8 +22,8 @@ def main():
     parser.add_argument("gpx_file", help="Pfad zur GPX-Datei (z.B. von Komoot)")
     parser.add_argument("--etappen", type=int, default=None,
                         help="Gewuenschte Anzahl Etappen (Standard: automatisch nach ~100km)")
-    parser.add_argument("--max-km", type=float, default=100,
-                        help="Maximale Kilometer pro Etappe (Standard: 100)")
+    parser.add_argument("--max-km", type=float, default=30,
+                        help="Maximale Kilometer pro Etappe (Standard: 30)")
     parser.add_argument("--fahrer", default=None,
                         help="Namen der Fahrer, kommagetrennt (z.B. 'Yannic,Phil,Basti')")
     parser.add_argument("--output", "-o", default=None,
