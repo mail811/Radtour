@@ -134,19 +134,12 @@ def fetch_sights(stage: Stage, max_dist_km: float = 10.0) -> list[dict]:
     bbox = _bounding_box(stage)
     bbox_str = f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}"
 
-    # Filter auf wikipedia/wikidata — OSM-Notabilitaetsstandard.
-    # Castles und Heritage-Kirchen sind eh selten/notabel und bleiben ungefiltert.
     query = f"""[out:json][timeout:60];
 (
-  nwr["tourism"="attraction"]["wikipedia"]({bbox_str});
-  nwr["tourism"="attraction"]["wikidata"]({bbox_str});
-  nwr["historic"="castle"]({bbox_str});
-  nwr["historic"~"monument|memorial|ruins|archaeological_site"]["wikipedia"]({bbox_str});
-  nwr["historic"~"monument|memorial|ruins|archaeological_site"]["wikidata"]({bbox_str});
-  nwr["tourism"="museum"]["wikipedia"]({bbox_str});
-  nwr["tourism"="museum"]["wikidata"]({bbox_str});
-  node["tourism"="viewpoint"]["wikipedia"]({bbox_str});
-  node["tourism"="viewpoint"]["wikidata"]({bbox_str});
+  nwr["tourism"="attraction"]({bbox_str});
+  nwr["historic"~"castle|monument|memorial|ruins|archaeological_site"]({bbox_str});
+  nwr["tourism"="museum"]({bbox_str});
+  node["tourism"="viewpoint"]({bbox_str});
   nwr["amenity"="place_of_worship"]["heritage"]({bbox_str});
 );
 out center;"""
@@ -192,6 +185,15 @@ out center;"""
             desc_parts.append(tags["description"][:100])
         desc = ", ".join(desc_parts)
 
+        # Notabilitaets-Score: Wiki/Heritage zuerst, dann nach Naehe sortieren.
+        score = 0
+        if tags.get("wikipedia") or tags.get("wikidata"):
+            score += 10
+        if tags.get("heritage"):
+            score += 5
+        if tags.get("stars") or tags.get("admission"):
+            score += 2
+
         sights.append({
             "name": name,
             "description": desc,
@@ -200,10 +202,11 @@ out center;"""
             "lat": round(lat, 6),
             "lon": round(lon, 6),
             "distance_km": round(dist, 1),
+            "score": score,
         })
 
-    sights.sort(key=lambda s: s["distance_km"])
-    return sights
+    sights.sort(key=lambda s: (-s["score"], s["distance_km"]))
+    return sights[:50]
 
 
 def fetch_gastro(stage: Stage, max_dist_km: float = 5.0) -> list[dict]:

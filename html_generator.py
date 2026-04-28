@@ -136,21 +136,16 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
     markers = []
     for i, sd in enumerate(stage_data):
         e = sd["enrichment"]
-        sights_by_cat: dict[str, list] = {}
         for sight in e.sights:
-            cat = sight.get("category", "sonstige")
-            sights_by_cat.setdefault(cat, []).append(sight)
-        for cat_sights in sights_by_cat.values():
-            for sight in cat_sights[:30]:
-                markers.append({
-                    "lat": sight.get("lat", 0),
-                    "lon": sight.get("lon", 0),
-                    "name": sight.get("name", ""),
-                    "desc": sight.get("description", ""),
-                    "type": "sight",
-                    "category": sight.get("category", "sonstige"),
-                    "stage": i + 1,
-                })
+            markers.append({
+                "lat": sight.get("lat", 0),
+                "lon": sight.get("lon", 0),
+                "name": sight.get("name", ""),
+                "desc": sight.get("description", ""),
+                "type": "sight",
+                "category": sight.get("category", "sonstige"),
+                "stage": i + 1,
+            })
         for camp in e.campsites:
             markers.append({
                 "lat": camp.get("lat", 0),
@@ -244,16 +239,13 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
                 categories_found[cat].append(sight)
 
             inner = ""
-            shown = 0
             for cat_key, cat_label, cat_icon in category_order:
                 if cat_key in categories_found:
-                    group = categories_found[cat_key][:30]
                     items = ""
-                    for sight in group:
+                    for sight in categories_found[cat_key]:
                         items += f'<li><strong>{sight["name"]}</strong></li>'
                     inner += f'<div class="sight-category"><span class="cat-header">{cat_icon} {cat_label}</span><ul>{items}</ul></div>'
-                    shown += len(group)
-            count = shown
+            count = len(e.sights)
             sights_html = f'<div class="subsection collapsible" data-stage="{i+1}" data-marker-type="sight"><h4 onclick="toggleSub(this)">Sehenswuerdigkeiten <span class="sub-badge">{count}</span><span class="sub-chevron">▶</span></h4><div class="sub-body">{inner}</div></div>'
 
         camps_html = ""
