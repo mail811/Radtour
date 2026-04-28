@@ -11,6 +11,10 @@ import argparse
 import os
 import sys
 
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+
 from gpx_parser import parse_gpx
 from api_enricher import enrich_tour
 from html_generator import generate_html
@@ -63,7 +67,9 @@ def main():
     if args.output:
         output_path = args.output
     else:
-        safe_name = tour.name.replace(" ", "_").replace("/", "-")
+        umlauts = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue",
+                                  "Ä": "Ae", "Ö": "Oe", "Ü": "Ue", "ß": "ss"})
+        safe_name = tour.name.translate(umlauts).replace(" ", "_").replace("/", "-")
         output_path = os.path.join(output_dir, f"{safe_name}.html")
 
     # Fahrer parsen
