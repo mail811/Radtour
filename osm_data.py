@@ -134,12 +134,19 @@ def fetch_sights(stage: Stage, max_dist_km: float = 10.0) -> list[dict]:
     bbox = _bounding_box(stage)
     bbox_str = f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}"
 
+    # Filter auf wikipedia/wikidata — OSM-Notabilitaetsstandard.
+    # Castles und Heritage-Kirchen sind eh selten/notabel und bleiben ungefiltert.
     query = f"""[out:json][timeout:60];
 (
-  nwr["tourism"="attraction"]({bbox_str});
-  nwr["historic"~"castle|monument|memorial|ruins|archaeological_site"]({bbox_str});
-  nwr["tourism"="museum"]({bbox_str});
-  node["tourism"="viewpoint"]({bbox_str});
+  nwr["tourism"="attraction"]["wikipedia"]({bbox_str});
+  nwr["tourism"="attraction"]["wikidata"]({bbox_str});
+  nwr["historic"="castle"]({bbox_str});
+  nwr["historic"~"monument|memorial|ruins|archaeological_site"]["wikipedia"]({bbox_str});
+  nwr["historic"~"monument|memorial|ruins|archaeological_site"]["wikidata"]({bbox_str});
+  nwr["tourism"="museum"]["wikipedia"]({bbox_str});
+  nwr["tourism"="museum"]["wikidata"]({bbox_str});
+  node["tourism"="viewpoint"]["wikipedia"]({bbox_str});
+  node["tourism"="viewpoint"]["wikidata"]({bbox_str});
   nwr["amenity"="place_of_worship"]["heritage"]({bbox_str});
 );
 out center;"""
