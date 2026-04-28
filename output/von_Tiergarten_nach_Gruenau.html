@@ -673,8 +673,8 @@ if (allBounds.length > 0) {
     iconAnchor: [14, 14],
     className: '',
   });
-  L.marker(allBounds[0], { icon: startIcon }).addTo(map).bindPopup('Start: Oranienburg');
-  L.marker(allBounds[allBounds.length - 1], { icon: endIcon }).addTo(map).bindPopup('Ziel: List auf Sylt');
+  L.marker(allBounds[0], { icon: startIcon }).addTo(map).bindPopup('Start: Berlin');
+  L.marker(allBounds[allBounds.length - 1], { icon: endIcon }).addTo(map).bindPopup('Ziel: Berlin');
   map.fitBounds(L.latLngBounds(allBounds), { padding: [20, 20] });
 }
 

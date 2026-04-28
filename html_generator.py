@@ -995,8 +995,8 @@ if (allBounds.length > 0) {{
     iconAnchor: [14, 14],
     className: '',
   }});
-  L.marker(allBounds[0], {{ icon: startIcon }}).addTo(map).bindPopup('Start: Oranienburg');
-  L.marker(allBounds[allBounds.length - 1], {{ icon: endIcon }}).addTo(map).bindPopup('Ziel: List auf Sylt');
+  L.marker(allBounds[0], {{ icon: startIcon }}).addTo(map).bindPopup('Start: {tour.stages[0].start_point}');
+  L.marker(allBounds[allBounds.length - 1], {{ icon: endIcon }}).addTo(map).bindPopup('Ziel: {tour.stages[-1].end_point}');
   map.fitBounds(L.latLngBounds(allBounds), {{ padding: [20, 20] }});
 }}
 
