@@ -366,9 +366,27 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
     background: linear-gradient(135deg, #2c3e50, #3498db);
     color: white;
     text-align: center;
+    position: relative;
   }}
   .hero-overlay {{
     padding: 24px 16px;
+  }}
+  .back-btn {{
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: rgba(255,255,255,0.18);
+    color: white;
+    text-decoration: none;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 0.85em;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255,255,255,0.25);
+    transition: background 0.15s;
+  }}
+  .back-btn:hover {{
+    background: rgba(255,255,255,0.3);
   }}
   .hero h1 {{
     font-size: 1.4em;
@@ -831,6 +849,7 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
 <body>
 
 <div class="hero">
+  <a href="./" class="back-btn">← Übersicht</a>
   <div class="hero-overlay">
     <h1>{tour.name}</h1>
     <div class="hero-stats">
