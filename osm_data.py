@@ -314,6 +314,81 @@ out center;"""
     return results
 
 
+def fetch_lodging(stage: Stage, radius_km: float = 5.0) -> list[dict]:
+    """Holt Hotels, Hostels und Pensionen rund um den Etappenendpunkt."""
+    end_lat = stage.points[-1].lat
+    end_lon = stage.points[-1].lon
+    radius_m = int(radius_km * 1000)
+
+    query = f"""[out:json][timeout:60];
+(
+  nwr["tourism"="hotel"](around:{radius_m},{end_lat},{end_lon});
+  nwr["tourism"="hostel"](around:{radius_m},{end_lat},{end_lon});
+  nwr["tourism"="guest_house"](around:{radius_m},{end_lat},{end_lon});
+  nwr["tourism"="motel"](around:{radius_m},{end_lat},{end_lon});
+);
+out center;"""
+
+    elements = _query_overpass(query)
+    results = []
+
+    type_labels = {
+        "hotel": "Hotel",
+        "hostel": "Hostel",
+        "guest_house": "Pension",
+        "motel": "Motel",
+    }
+    type_icons = {
+        "hotel": "🏨",
+        "hostel": "🛏",
+        "guest_house": "🏠",
+        "motel": "🏨",
+    }
+
+    for el in elements:
+        name = _get_name(el)
+        if not name:
+            continue
+
+        lat, lon = _get_coords(el)
+        if lat == 0 and lon == 0:
+            continue
+
+        dist = haversine(lat, lon, end_lat, end_lon) / 1000
+        if dist > radius_km:
+            continue
+
+        tags = el.get("tags", {})
+        tourism_type = tags.get("tourism", "hotel")
+        category_label = type_labels.get(tourism_type, "Unterkunft")
+        icon = type_icons.get(tourism_type, "🏨")
+
+        website = tags.get("website", tags.get("contact:website", tags.get("url")))
+        phone = tags.get("phone", tags.get("contact:phone", ""))
+        stars = tags.get("stars", "")
+
+        desc_parts = [category_label]
+        if stars:
+            desc_parts.append(f"{stars}★")
+        desc = ", ".join(desc_parts)
+
+        results.append({
+            "name": name,
+            "description": desc,
+            "category": tourism_type,
+            "category_label": category_label,
+            "icon": icon,
+            "lat": round(lat, 6),
+            "lon": round(lon, 6),
+            "website": website,
+            "phone": phone,
+            "distance_km": round(dist, 1),
+        })
+
+    results.sort(key=lambda r: r["distance_km"])
+    return results
+
+
 def fetch_surface(stage: Stage) -> dict:
     """Ermittelt Straßenoberflächen entlang der Etappe via Overpass."""
     bbox = _bounding_box(stage, padding_km=2.0)
@@ -416,6 +491,7 @@ def fetch_osm_data(tour: TourData, max_dist_km: float = 10.0) -> list[dict]:
 
     data_types = [
         ("campsites", lambda s: fetch_campsites(s, max_dist_km)),
+        ("lodging", lambda s: fetch_lodging(s)),
         ("sights", lambda s: fetch_sights(s, max_dist_km)),
         ("gastro", lambda s: fetch_gastro(s)),
         ("emergency", lambda s: fetch_emergency(s)),

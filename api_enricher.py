@@ -21,6 +21,7 @@ class StageEnrichment:
     gastro: list[dict] = None
     emergency: list[dict] = None
     surface: dict = None
+    lodging: list[dict] = None
 
     def __post_init__(self):
         if self.gastro is None:
@@ -29,6 +30,8 @@ class StageEnrichment:
             self.emergency = []
         if self.surface is None:
             self.surface = {}
+        if self.lodging is None:
+            self.lodging = []
 
 
 def _sample_waypoints(stage: Stage, n: int = 10) -> list[tuple[float, float]]:
@@ -95,6 +98,7 @@ def enrich_tour(tour: TourData, max_dist_km: float = 10.0) -> list[StageEnrichme
             gastro=osm.get("gastro", []),
             emergency=osm.get("emergency", []),
             surface=osm.get("surface", {}),
+            lodging=osm.get("lodging", []),
         ))
 
     return enrichments

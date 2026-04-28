@@ -178,6 +178,17 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
                 "stage": i + 1,
                 "website": em.get("website"),
             })
+        for lo in e.lodging:
+            markers.append({
+                "lat": lo.get("lat", 0),
+                "lon": lo.get("lon", 0),
+                "name": lo.get("name", ""),
+                "desc": lo.get("description", ""),
+                "type": "lodging",
+                "category": lo.get("category", "hotel"),
+                "stage": i + 1,
+                "website": lo.get("website"),
+            })
     markers_json = json.dumps(markers)
 
     # Farben für Etappen
@@ -247,6 +258,36 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
                 items += f'<li><strong>{camp["name"]}</strong> — {camp.get("description", "")}{link}</li>'
             count = len(e.campsites)
             camps_html = f'<div class="subsection collapsible" data-stage="{i+1}" data-marker-type="camp"><h4 onclick="toggleSub(this)">Campingplaetze <span class="sub-badge">{count}</span><span class="sub-chevron">▶</span></h4><div class="sub-body"><ul>{items}</ul></div></div>'
+
+        # Hotels/Hostels rund um den Etappenendpunkt
+        lodging_html = ""
+        if e.lodging:
+            lodging_groups = {"hotel": [], "hostel": [], "guest_house": [], "motel": []}
+            for lo in e.lodging:
+                cat = lo.get("category", "hotel")
+                if cat in lodging_groups:
+                    lodging_groups[cat].append(lo)
+
+            inner = ""
+            for cat, icon, label in [("hotel", "🏨", "Hotels"), ("hostel", "🛏", "Hostels"),
+                                      ("guest_house", "🏠", "Pensionen"), ("motel", "🏨", "Motels")]:
+                group = lodging_groups.get(cat, [])[:8]
+                if group:
+                    items = ""
+                    for lo in group:
+                        parts = [f'<strong>{lo["name"]}</strong>']
+                        if lo.get("description") and lo["description"] != label:
+                            parts.append(f' — {lo["description"]}')
+                        if lo.get("phone"):
+                            parts.append(f' <a href="tel:{lo["phone"]}">{lo["phone"]}</a>')
+                        if lo.get("website"):
+                            parts.append(f' <a href="{lo["website"]}" target="_blank">Website</a>')
+                        parts.append(f' <span class="dist">{lo["distance_km"]} km vom Ziel</span>')
+                        items += f'<li>{"".join(parts)}</li>'
+                    inner += f'<div class="sight-category"><span class="cat-header">{icon} {label}</span><ul>{items}</ul></div>'
+
+            count = len(e.lodging)
+            lodging_html = f'<div class="subsection collapsible" data-stage="{i+1}" data-marker-type="lodging"><h4 onclick="toggleSub(this)">Uebernachtung am Ziel <span class="sub-badge">{count}</span><span class="sub-chevron">▶</span></h4><div class="sub-body">{inner}</div></div>'
 
         # Gastronomie
         gastro_html = ""
@@ -330,6 +371,7 @@ def generate_html(tour: TourData, enrichments: list[StageEnrichment], riders: li
       {gastro_html}
       {sights_html}
       {camps_html}
+      {lodging_html}
       {emergency_html}
       {trivia_html}
     </div>"""
@@ -975,6 +1017,10 @@ const catIcons = {{
   'fahrrad': '🔧',
   'krankenhaus': '🏥',
   'bahnhof': '🚉',
+  'hotel': '🏨',
+  'hostel': '🛏',
+  'guest_house': '🏠',
+  'motel': '🏨',
 }};
 
 // Marker in Layer-Gruppen: markerLayers[stage][type] = L.layerGroup
